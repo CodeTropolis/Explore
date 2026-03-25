@@ -4,7 +4,7 @@ public class Player : MonoBehaviour
 {
     PlayerInputActions input;
     Vector2 moveInput;
-    [SerializeField] float moveSpeed = 5f;
+    [SerializeField] float moveSpeed = 8f;
     [SerializeField] float jumpHeight = 8f;
     [SerializeField] LayerMask groundLayer;
 
@@ -15,6 +15,7 @@ public class Player : MonoBehaviour
     [SerializeField] float suspensionStiffness = 5f;
     [SerializeField] float suspensionDamping = 1f;
 
+    SpriteRenderer spriteRenderer;
     bool isGrounded;
     float verticalVelocity;
 
@@ -27,6 +28,8 @@ public class Player : MonoBehaviour
 
     void Awake()
     {
+        spriteRenderer = GetComponent<SpriteRenderer>();
+
         var rb = GetComponent<Rigidbody2D>();
         if (rb != null) rb.bodyType = RigidbodyType2D.Kinematic;
 
@@ -48,6 +51,9 @@ public class Player : MonoBehaviour
 
         float dx = moveInput.x * moveSpeed * Time.deltaTime;
         transform.Translate(Vector2.right * dx);
+
+        if (moveInput.x != 0f && spriteRenderer != null)
+            spriteRenderer.flipX = moveInput.x < 0f;
 
         // Wheels are the sole ground detectors
         float frontGroundY, rearGroundY;
@@ -112,7 +118,7 @@ public class Player : MonoBehaviour
         if (grounded && Mathf.Abs(verticalVelocity) < 1f)
         {
             // Chassis at rest — hard-snap wheel to track the surface precisely.
-            newY     = targetY;
+            newY = targetY;
             velocity = 0f;
         }
         else
