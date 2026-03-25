@@ -1,7 +1,9 @@
 using UnityEngine;
-
-public class player : MonoBehaviour
+using UnityEngine.InputSystem;
+public class Player : MonoBehaviour
 {
+    PlayerInputActions input;
+    Vector2 moveInput;
     [SerializeField] float moveSpeed = 5f;
     [SerializeField] float jumpHeight = 8f;
     [SerializeField] LayerMask groundLayer;
@@ -9,25 +11,29 @@ public class player : MonoBehaviour
     Rigidbody2D rb;
     bool isGrounded;
 
-    void Start()
+    void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
-        rb.gravityScale = 3f;
+        input = new PlayerInputActions();
+
+        input.Player.Move.performed += ctx => moveInput = ctx.ReadValue<Vector2>();
+        input.Player.Move.canceled += ctx => moveInput = Vector2.zero;
+
+        input.Player.Jump.performed += ctx => Jump();
     }
+
+    void OnEnable() => input.Enable();
+    void OnDisable() => input.Disable();
 
     void Update()
     {
-        // Horizontal movement
-        float horizontal = Input.GetAxisRaw("Horizontal");
-        transform.Translate(Vector2.right * horizontal * moveSpeed * Time.deltaTime);
-
-        // Ground check
         isGrounded = Physics2D.Raycast(transform.position, Vector2.down, 0.6f, groundLayer);
+        transform.Translate(Vector2.right * moveInput.x * moveSpeed * Time.deltaTime);
+    }
 
-        // Jump
-        if (Input.GetButtonDown("Jump") && isGrounded)
-        {
+    void Jump()
+    {
+        if (isGrounded)
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpHeight);
-        }
     }
 }
