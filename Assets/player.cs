@@ -8,17 +8,34 @@ public class Player : MonoBehaviour
     [SerializeField] float jumpHeight = 8f;
     [SerializeField] LayerMask groundLayer;
 
-    Rigidbody2D rb;
+    [Header("Wheels")]
+    [SerializeField] Transform frontWheel;
+    [SerializeField] Transform rearWheel;
+    [SerializeField] float suspensionRestLength = 0.4f;
+    [SerializeField] float suspensionStiffness = 5f;
+    [SerializeField] float suspensionDamping = 1f;
+
     bool isGrounded;
+    float verticalVelocity;
+
+    float frontWheelVel;
+    float rearWheelVel;
+    float frontWheelAngle;
+    float rearWheelAngle;
+    CircleCollider2D frontWheelCollider;
+    CircleCollider2D rearWheelCollider;
 
     void Awake()
     {
-        rb = GetComponent<Rigidbody2D>();
-        input = new PlayerInputActions();
+        var rb = GetComponent<Rigidbody2D>();
+        if (rb != null) rb.bodyType = RigidbodyType2D.Kinematic;
 
+        if (frontWheel != null) frontWheelCollider = frontWheel.GetComponent<CircleCollider2D>();
+        if (rearWheel != null) rearWheelCollider = rearWheel.GetComponent<CircleCollider2D>();
+
+        input = new PlayerInputActions();
         input.Player.Move.performed += ctx => moveInput = ctx.ReadValue<Vector2>();
         input.Player.Move.canceled += ctx => moveInput = Vector2.zero;
-
         input.Player.Jump.performed += ctx => Jump();
     }
 
@@ -27,13 +44,103 @@ public class Player : MonoBehaviour
 
     void Update()
     {
-        isGrounded = Physics2D.Raycast(transform.position, Vector2.down, 0.6f, groundLayer);
-        transform.Translate(Vector2.right * moveInput.x * moveSpeed * Time.deltaTime);
+        verticalVelocity += Physics2D.gravity.y * Time.deltaTime;
+
+        float dx = moveInput.x * moveSpeed * Time.deltaTime;
+        transform.Translate(Vector2.right * dx);
+
+        // Wheels are the sole ground detectors
+        float frontGroundY, rearGroundY;
+        bool frontGrounded = UpdateWheelSuspension(frontWheel, frontWheelCollider, ref frontWheelVel, out frontGroundY);
+        bool rearGrounded = UpdateWheelSuspension(rearWheel, rearWheelCollider, ref rearWheelVel, out rearGroundY);
+        isGrounded = frontGrounded || rearGrounded;
+
+        if (isGrounded && verticalVelocity < 0f)
+        {
+            float groundY = frontGrounded ? frontGroundY : rearGroundY;
+            float radius = frontGrounded && frontWheelCollider != null ? frontWheelCollider.radius
+                           : rearWheelCollider != null ? rearWheelCollider.radius : 0.1f;
+            float landingY = groundY + radius + suspensionRestLength;
+
+            // Stop if this frame's fall would reach or pass the landing point,
+            // preventing the one-frame overshoot that causes the upward snap.
+            float remainingFall = transform.position.y - landingY;
+            if (remainingFall <= -verticalVelocity * Time.deltaTime)
+            {
+                verticalVelocity = 0f;
+                Vector3 pos = transform.position;
+                pos.y = landingY;
+                transform.position = pos;
+            }
+        }
+
+        transform.Translate(Vector2.up * verticalVelocity * Time.deltaTime);
+
+        // Spin wheels proportional to horizontal travel
+        SpinWheel(frontWheel, frontWheelCollider, dx, ref frontWheelAngle);
+        SpinWheel(rearWheel, rearWheelCollider, dx, ref rearWheelAngle);
+    }
+
+    // Returns whether the wheel is touching ground; outputs the world Y of the ground surface.
+    bool UpdateWheelSuspension(Transform wheel, CircleCollider2D col, ref float velocity, out float groundWorldY)
+    {
+        groundWorldY = 0f;
+        if (wheel == null) return false;
+
+        float radius = col != null ? col.radius : 0.1f;
+
+        Vector2 attachWorld = transform.TransformPoint(new Vector3(wheel.localPosition.x, 0f, 0f));
+        float castDist = suspensionRestLength + radius + 0.5f;
+        RaycastHit2D hit = Physics2D.Raycast(attachWorld, Vector2.down, castDist, groundLayer);
+
+        float currentY = wheel.localPosition.y;
+        bool grounded = false;
+        float targetY = -suspensionRestLength;
+
+        if (hit.collider != null)
+        {
+            groundWorldY = hit.point.y;
+            float wheelWorldY = groundWorldY + radius;
+            float rawTargetY = transform.InverseTransformPoint(new Vector3(0f, wheelWorldY, 0f)).y;
+
+            grounded = rawTargetY >= (-suspensionRestLength - radius);
+            if (grounded)
+                targetY = Mathf.Clamp(rawTargetY, -suspensionRestLength - radius, -radius);
+        }
+
+        float newY;
+        if (grounded && Mathf.Abs(verticalVelocity) < 1f)
+        {
+            // Chassis at rest — hard-snap wheel to track the surface precisely.
+            newY     = targetY;
+            velocity = 0f;
+        }
+        else
+        {
+            // Falling or airborne: spring toward target so the wheel doesn't visually
+            // pop downward the moment the raycast first detects ground below.
+            float springForce = (targetY - currentY) * suspensionStiffness;
+            velocity += springForce * Time.deltaTime;
+            velocity *= Mathf.Clamp01(1f - suspensionDamping * Time.deltaTime);
+            newY = currentY + velocity * Time.deltaTime;
+        }
+
+        wheel.localPosition = new Vector3(wheel.localPosition.x, newY, wheel.localPosition.z);
+        return grounded;
+    }
+
+    void SpinWheel(Transform wheel, CircleCollider2D col, float dx, ref float angle)
+    {
+        if (wheel == null) return;
+        float radius = col != null ? col.radius : 0.1f;
+        angle -= (dx / (2f * Mathf.PI * radius)) * 360f;
+        // Set world-space rotation to avoid distortion from non-uniform parent scale
+        wheel.rotation = Quaternion.Euler(0f, 0f, angle);
     }
 
     void Jump()
     {
         if (isGrounded)
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpHeight);
+            verticalVelocity = jumpHeight;
     }
 }
