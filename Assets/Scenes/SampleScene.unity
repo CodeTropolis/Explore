@@ -904,19 +904,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c0e43b197db614ac38f2306499c90294, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  moveSpeed: 9
-  jumpHeight: 11
+  moveSpeed: 10
+  jumpHeight: 8
   groundLayer:
     serializedVersion: 2
     m_Bits: 8
   frontWheel: {fileID: 750875629}
   rearWheel: {fileID: 74832138}
-  suspensionRestLength: 1
-  suspensionStiffness: 0.1
-  suspensionDamping: 0.5
-  jumpWheelSquash: 0.08
-  landingWheelSquash: 0.12
-  wheelSquashDuration: 0.18
 --- !u!50 &1307509539
 Rigidbody2D:
   serializedVersion: 5
@@ -983,7 +977,7 @@ BoxCollider2D:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
     oldSize: {x: 3.53, y: 1.32}
-    newSize: {x: 1, y: 1}
+    newSize: {x: 3.53, y: 1.32}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
     adaptiveTiling: 0
@@ -1044,7 +1038,7 @@ SpriteRenderer:
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 3.53, y: 1.32}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
