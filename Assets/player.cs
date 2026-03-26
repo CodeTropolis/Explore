@@ -15,10 +15,17 @@ public class Player : MonoBehaviour
     [SerializeField] Transform frontWheel;
     [SerializeField] Transform rearWheel;
 
+    [Header("Chassis 'Bob'")]
+    [SerializeField] float bobAmount = 0.04f;
+    [SerializeField] float bobFrequency = 3.0f;
+
     SpriteRenderer spriteRenderer;
     float verticalVelocity;
     float horizontalVelocity;
     bool isGrounded;
+
+    float bobPhase;
+    float bobOffset;
 
     float frontWheelAngle;
     float rearWheelAngle;
@@ -46,6 +53,9 @@ public class Player : MonoBehaviour
 
     void Update()
     {
+        // Undo last frame's bob so CheckGround operates on the true chassis position
+        transform.position -= new Vector3(0f, bobOffset, 0f);
+
         verticalVelocity += Physics2D.gravity.y * Time.deltaTime;
 
         float targetSpeed = moveInput.x * moveSpeed;
@@ -69,6 +79,18 @@ public class Player : MonoBehaviour
 
         SpinWheel(frontWheel, frontWheelCollider, dx, ref frontWheelAngle);
         SpinWheel(rearWheel, rearWheelCollider, dx, ref rearWheelAngle);
+
+        // Chassis bob — only while grounded and moving
+        if (isGrounded && horizontalVelocity != 0f)
+        {
+            bobPhase += Mathf.Abs(dx) * bobFrequency;
+            bobOffset = Mathf.Sin(bobPhase) * bobAmount;
+        }
+        else
+        {
+            bobOffset = 0f;
+        }
+        transform.position += new Vector3(0f, bobOffset, 0f);
     }
 
     void CheckGround()
