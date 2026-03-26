@@ -14,10 +14,20 @@ public class Player : MonoBehaviour
     [SerializeField] float suspensionRestLength = 0.4f;
     [SerializeField] float suspensionStiffness = 5f;
     [SerializeField] float suspensionDamping = 1f;
+    [SerializeField] float jumpWheelSquash = 0.08f;
+    [SerializeField] float landingWheelSquash = 0.12f;
+    [SerializeField] float wheelSquashDuration = 0.18f;
 
     SpriteRenderer spriteRenderer;
     bool isGrounded;
     float verticalVelocity;
+
+    // Squash animation — driven by a sine arc over squashTimer
+    float squashTimer;
+    float squashMagnitude;
+    // Visual-only offsets kept separately so suspension spring operates on real positions
+    float frontSquashOffset;
+    float rearSquashOffset;
 
     float frontWheelVel;
     float rearWheelVel;
@@ -55,10 +65,14 @@ public class Player : MonoBehaviour
         if (moveInput.x != 0f && spriteRenderer != null)
             spriteRenderer.flipX = moveInput.x < 0f;
 
+        // Remove last frame's visual squash so the suspension spring operates on real positions.
+        // This prevents the spring from drifting due to the squash offset in its currentY read.
+        if (frontWheel != null) frontWheel.localPosition -= new Vector3(0f, frontSquashOffset, 0f);
+        if (rearWheel != null) rearWheel.localPosition -= new Vector3(0f, rearSquashOffset, 0f);
+
         // Wheels are the sole ground detectors
-        float frontGroundY, rearGroundY;
-        bool frontGrounded = UpdateWheelSuspension(frontWheel, frontWheelCollider, ref frontWheelVel, out frontGroundY);
-        bool rearGrounded = UpdateWheelSuspension(rearWheel, rearWheelCollider, ref rearWheelVel, out rearGroundY);
+        bool frontGrounded = UpdateWheelSuspension(frontWheel, frontWheelCollider, ref frontWheelVel, out float frontGroundY);
+        bool rearGrounded = UpdateWheelSuspension(rearWheel, rearWheelCollider, ref rearWheelVel, out float rearGroundY);
         isGrounded = frontGrounded || rearGrounded;
 
         if (isGrounded && verticalVelocity < 0f)
@@ -73,6 +87,10 @@ public class Player : MonoBehaviour
             float remainingFall = transform.position.y - landingY;
             if (remainingFall <= -verticalVelocity * Time.deltaTime)
             {
+                // Trigger landing squash proportional to impact speed
+                squashMagnitude = Mathf.Min(landingWheelSquash, landingWheelSquash * (-verticalVelocity / jumpHeight));
+                squashTimer = wheelSquashDuration;
+
                 verticalVelocity = 0f;
                 Vector3 pos = transform.position;
                 pos.y = landingY;
@@ -81,6 +99,23 @@ public class Player : MonoBehaviour
         }
 
         transform.Translate(Vector2.up * verticalVelocity * Time.deltaTime);
+
+        // Advance squash animation and compute new offsets
+        if (squashTimer > 0f)
+        {
+            squashTimer = Mathf.Max(0f, squashTimer - Time.deltaTime);
+            float t = 1f - squashTimer / wheelSquashDuration; // 0→1 over duration
+            float offset = squashMagnitude * Mathf.Sin(t * Mathf.PI); // rises then falls
+            frontSquashOffset = rearSquashOffset = offset;
+        }
+        else
+        {
+            frontSquashOffset = rearSquashOffset = 0f;
+        }
+
+        // Apply squash on top of suspension result
+        ApplyWheelSquash(frontWheel, frontWheelCollider, frontSquashOffset);
+        ApplyWheelSquash(rearWheel, rearWheelCollider, rearSquashOffset);
 
         // Spin wheels proportional to horizontal travel
         SpinWheel(frontWheel, frontWheelCollider, dx, ref frontWheelAngle);
@@ -144,9 +179,22 @@ public class Player : MonoBehaviour
         wheel.rotation = Quaternion.Euler(0f, 0f, angle);
     }
 
+    static void ApplyWheelSquash(Transform wheel, CircleCollider2D col, float offset)
+    {
+        if (wheel == null) return;
+        float radius = col != null ? col.radius : 0.1f;
+        var p = wheel.localPosition;
+        p.y = Mathf.Min(p.y + offset, -radius);
+        wheel.localPosition = p;
+    }
+
     void Jump()
     {
         if (isGrounded)
+        {
+            squashMagnitude = jumpWheelSquash;
+            squashTimer = wheelSquashDuration;
             verticalVelocity = jumpHeight;
+        }
     }
 }
