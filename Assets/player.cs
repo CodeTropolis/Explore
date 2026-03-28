@@ -146,4 +146,35 @@ public class Player : MonoBehaviour
         if (isGrounded)
             verticalVelocity = jumpHeight;
     }
+
+    void OnDrawGizmos()
+    {
+        //DrawWheelGizmo(frontWheel);
+        //DrawWheelGizmo(rearWheel);
+    }
+
+    void DrawWheelGizmo(Transform wheel)
+    {
+        if (wheel == null) return;
+        var col = wheel.GetComponent<CircleCollider2D>();
+        float radius = col != null ? col.radius : 0.1f;
+        Vector2 origin = transform.TransformPoint(new Vector3(wheel.localPosition.x, 0f, 0f));
+        float castDist = Mathf.Abs(wheel.localPosition.y) + radius + 0.05f;
+
+        RaycastHit2D hit = Physics2D.Raycast(origin, Vector2.down, castDist, groundLayer);
+        if (hit.collider != null)
+        {
+            Gizmos.color = Color.green;
+            Gizmos.DrawLine(origin, hit.point);
+            Gizmos.DrawWireSphere(hit.point, 0.05f);
+        }
+        else
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawLine(origin, origin + Vector2.down * castDist);
+        }
+
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(wheel.position, radius);
+    }
 }
