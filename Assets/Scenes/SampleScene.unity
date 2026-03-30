@@ -1191,6 +1191,13 @@ MonoBehaviour:
   bobAmount: 0.04
   bobFrequency: 4
   rotationSpeed: 10
+  suspensionStrength: 60
+  suspensionDamping: 18
+  suspensionRestDistance: 0.25
+  suspensionMaxCompression: 0.3
+  impactMultiplier: 0.02
+  weightTransferStrength: 0.02
+  weightTransferDamping: 8
 --- !u!50 &1307509539
 Rigidbody2D:
   serializedVersion: 5
