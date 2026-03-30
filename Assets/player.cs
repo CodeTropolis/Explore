@@ -19,6 +19,9 @@ public class Player : MonoBehaviour
     [SerializeField] float bobAmount = 0.04f;
     [SerializeField] float bobFrequency = 12.0f;
 
+    [Header("Rotation")]
+    [SerializeField] float rotationSpeed = 10f;
+
     SpriteRenderer spriteRenderer;
     float verticalVelocity;
     float horizontalVelocity;
@@ -53,7 +56,7 @@ public class Player : MonoBehaviour
 
     void Update()
     {
-        // Undo last frame's bob so CheckGround operates on the true chassis position
+        // Remove last frame bob before calculations
         transform.position -= new Vector3(0f, chassisBobOffset, 0f);
 
         verticalVelocity += Physics2D.gravity.y * Time.deltaTime;
@@ -70,7 +73,8 @@ public class Player : MonoBehaviour
         if (horizontalVelocity != 0f && spriteRenderer != null)
             spriteRenderer.flipX = horizontalVelocity < 0f;
 
-        CheckGround();
+        // Ground + slope handling
+        CheckGroundAndRotate();
 
         if (isGrounded)
             verticalVelocity = 0f;
@@ -80,7 +84,7 @@ public class Player : MonoBehaviour
         SpinWheel(frontWheel, frontWheelCollider, dx, ref frontWheelAngle);
         SpinWheel(rearWheel, rearWheelCollider, dx, ref rearWheelAngle);
 
-        // Chassis bob — only while grounded and moving
+        // Chassis bob
         if (isGrounded && horizontalVelocity != 0f)
         {
             chassisBobPhase += Mathf.Abs(dx) * bobFrequency;
@@ -90,10 +94,11 @@ public class Player : MonoBehaviour
         {
             chassisBobOffset = 0f;
         }
+
         transform.position += new Vector3(0f, chassisBobOffset, 0f);
     }
 
-    void CheckGround()
+    void CheckGroundAndRotate()
     {
         bool frontGrounded = WheelGroundCheck(frontWheel, frontWheelCollider, out float frontTargetY);
         bool rearGrounded = WheelGroundCheck(rearWheel, rearWheelCollider, out float rearTargetY);
@@ -101,11 +106,29 @@ public class Player : MonoBehaviour
         if ((frontGrounded || rearGrounded) && verticalVelocity <= 0f)
         {
             isGrounded = true;
-            float targetY = frontGrounded && rearGrounded ? Mathf.Max(frontTargetY, rearTargetY)
-                          : frontGrounded ? frontTargetY : rearTargetY;
+
+            float targetY = frontGrounded && rearGrounded
+                ? Mathf.Max(frontTargetY, rearTargetY)
+                : frontGrounded ? frontTargetY : rearTargetY;
+
+            // Smooth vertical alignment
             Vector3 pos = transform.position;
-            pos.y = targetY;
+            pos.y = Mathf.Lerp(pos.y, targetY, 10f * Time.deltaTime);
             transform.position = pos;
+
+            // --- NEW: slope rotation ---
+            if (frontGrounded && rearGrounded)
+            {
+                float dx = frontWheel.localPosition.x - rearWheel.localPosition.x;
+                float dy = frontTargetY - rearTargetY;
+
+                float targetAngle = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
+
+                float currentAngle = transform.eulerAngles.z;
+                float smoothed = Mathf.LerpAngle(currentAngle, targetAngle, rotationSpeed * Time.deltaTime);
+
+                transform.rotation = Quaternion.Euler(0f, 0f, smoothed);
+            }
         }
         else
         {
@@ -113,20 +136,22 @@ public class Player : MonoBehaviour
         }
     }
 
-    // Raycasts from chassis level at the wheel's X; returns the chassis Y that places the wheel on the surface.
     bool WheelGroundCheck(Transform wheel, CircleCollider2D col, out float targetChassisY)
     {
         targetChassisY = 0f;
         if (wheel == null) return false;
 
         float radius = col != null ? col.radius : 0.1f;
-        Vector2 origin = transform.TransformPoint(new Vector3(wheel.localPosition.x, 0f, 0f));
-        float castDist = Mathf.Abs(wheel.localPosition.y) + radius + 0.05f;
+
+        // ✅ FIX: use actual world position (handles rotation correctly)
+        Vector2 origin = wheel.position;
+
+        float castDist = Mathf.Abs(wheel.localPosition.y) + radius + 0.1f;
+
         RaycastHit2D hit = Physics2D.Raycast(origin, Vector2.down, castDist, groundLayer);
 
         if (hit.collider != null)
         {
-            // chassis Y = ground surface Y + wheel radius - wheel's local Y offset (local Y is negative)
             targetChassisY = hit.point.y + radius - wheel.localPosition.y;
             return true;
         }
@@ -136,6 +161,7 @@ public class Player : MonoBehaviour
     void SpinWheel(Transform wheel, CircleCollider2D col, float dx, ref float angle)
     {
         if (wheel == null) return;
+
         float radius = col != null ? col.radius : 0.1f;
         angle -= dx / (2f * Mathf.PI * radius) * 360f;
         wheel.rotation = Quaternion.Euler(0f, 0f, angle);
@@ -145,11 +171,5 @@ public class Player : MonoBehaviour
     {
         if (isGrounded)
             verticalVelocity = jumpHeight;
-    }
-
-    void OnDrawGizmos()
-    {
-        // GizmoUtils.DrawWheelGizmo(frontWheel, transform, groundLayer);
-        // GizmoUtils.DrawWheelGizmo(rearWheel, transform, groundLayer);
     }
 }
