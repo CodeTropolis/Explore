@@ -100,8 +100,8 @@ public class Player : MonoBehaviour
 
     void CheckGroundAndRotate()
     {
-        bool frontGrounded = WheelGroundCheck(frontWheel, frontWheelCollider, out float frontTargetY);
-        bool rearGrounded = WheelGroundCheck(rearWheel, rearWheelCollider, out float rearTargetY);
+        bool frontGrounded = WheelGroundCheck(frontWheel, frontWheelCollider, out float frontTargetY, out Vector2 frontNormal);
+        bool rearGrounded = WheelGroundCheck(rearWheel, rearWheelCollider, out float rearTargetY, out Vector2 rearNormal);
 
         if ((frontGrounded || rearGrounded) && verticalVelocity <= 0f)
         {
@@ -111,24 +111,20 @@ public class Player : MonoBehaviour
                 ? Mathf.Max(frontTargetY, rearTargetY)
                 : frontGrounded ? frontTargetY : rearTargetY;
 
-            // Smooth vertical alignment
             Vector3 pos = transform.position;
             pos.y = Mathf.Lerp(pos.y, targetY, 10f * Time.deltaTime);
             transform.position = pos;
 
-            // --- NEW: slope rotation ---
-            if (frontGrounded && rearGrounded)
-            {
-                float dx = frontWheel.localPosition.x - rearWheel.localPosition.x;
-                float dy = frontTargetY - rearTargetY;
+            // When both wheels hit, their normals are averaged 
+            // (handles bumpy transitions); when only one hits, 
+            // that normal alone drives the rotation
+            Vector2 normal = frontGrounded && rearGrounded
+                ? ((frontNormal + rearNormal) * 0.5f).normalized
+                : frontGrounded ? frontNormal : rearNormal;
 
-                float targetAngle = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
-
-                float currentAngle = transform.eulerAngles.z;
-                float smoothed = Mathf.LerpAngle(currentAngle, targetAngle, rotationSpeed * Time.deltaTime);
-
-                transform.rotation = Quaternion.Euler(0f, 0f, smoothed);
-            }
+            float targetAngle = Mathf.Atan2(-normal.x, normal.y) * Mathf.Rad2Deg;
+            float smoothed = Mathf.LerpAngle(transform.eulerAngles.z, targetAngle, rotationSpeed * Time.deltaTime);
+            transform.rotation = Quaternion.Euler(0f, 0f, smoothed);
         }
         else
         {
@@ -136,23 +132,21 @@ public class Player : MonoBehaviour
         }
     }
 
-    bool WheelGroundCheck(Transform wheel, CircleCollider2D col, out float targetChassisY)
+    bool WheelGroundCheck(Transform wheel, CircleCollider2D col, out float targetChassisY, out Vector2 normal)
     {
         targetChassisY = 0f;
+        normal = Vector2.up;
         if (wheel == null) return false;
 
         float radius = col != null ? col.radius : 0.1f;
-
-        // ✅ FIX: use actual world position (handles rotation correctly)
         Vector2 origin = wheel.position;
-
         float castDist = Mathf.Abs(wheel.localPosition.y) + radius + 0.1f;
-
         RaycastHit2D hit = Physics2D.Raycast(origin, Vector2.down, castDist, groundLayer);
 
         if (hit.collider != null)
         {
             targetChassisY = hit.point.y + radius - wheel.localPosition.y;
+            normal = hit.normal;
             return true;
         }
         return false;
