@@ -29,7 +29,7 @@ public class Player : MonoBehaviour
     [SerializeField] float bobFrequency = 12.0f;
 
     [Header("Rotation")]
-    [SerializeField] float rotationSpeed = 10f;
+    [SerializeField] float rotationSpeed = 20f;
 
     SpriteRenderer spriteRenderer;
     float verticalVelocity;
@@ -114,7 +114,7 @@ public class Player : MonoBehaviour
     void CheckGroundAndRotate()
     {
         var front = WheelGroundCheck(frontWheel, frontWheelCollider);
-        var rear  = WheelGroundCheck(rearWheel, rearWheelCollider);
+        var rear = WheelGroundCheck(rearWheel, rearWheelCollider);
 
         if ((front.Grounded || rear.Grounded) && verticalVelocity <= 0f)
         {

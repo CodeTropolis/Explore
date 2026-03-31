@@ -1191,7 +1191,7 @@ MonoBehaviour:
   rearWheel: {fileID: 850348538}
   bobAmount: 0.04
   bobFrequency: 4
-  rotationSpeed: 10
+  rotationSpeed: 20
 --- !u!50 &1307509539
 Rigidbody2D:
   serializedVersion: 5
