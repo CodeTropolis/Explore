@@ -13,6 +13,7 @@ public class Player : MonoBehaviour
 
     [Header("Wheels")]
     [SerializeField] Transform frontWheel;
+    [SerializeField] Transform midWheel;
     [SerializeField] Transform rearWheel;
 
     [Header("Chassis 'Bob'")]
@@ -31,8 +32,10 @@ public class Player : MonoBehaviour
     float chassisBobOffset;
 
     float frontWheelAngle;
+    float midWheelAngle;
     float rearWheelAngle;
     CircleCollider2D frontWheelCollider;
+    CircleCollider2D midWheelCollider;
     CircleCollider2D rearWheelCollider;
 
     void Awake()
@@ -43,6 +46,7 @@ public class Player : MonoBehaviour
         if (rb != null) rb.bodyType = RigidbodyType2D.Kinematic;
 
         if (frontWheel != null) frontWheelCollider = frontWheel.GetComponent<CircleCollider2D>();
+        if (midWheel != null) midWheelCollider = midWheel.GetComponent<CircleCollider2D>();
         if (rearWheel != null) rearWheelCollider = rearWheel.GetComponent<CircleCollider2D>();
 
         input = new PlayerInputActions();
@@ -82,6 +86,7 @@ public class Player : MonoBehaviour
             transform.Translate(Vector2.up * verticalVelocity * Time.deltaTime);
 
         SpinWheel(frontWheel, frontWheelCollider, dx, ref frontWheelAngle);
+        SpinWheel(midWheel, midWheelCollider, dx, ref midWheelAngle);
         SpinWheel(rearWheel, rearWheelCollider, dx, ref rearWheelAngle);
 
         // Chassis bob
