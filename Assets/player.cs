@@ -3,6 +3,14 @@ using UnityEngine.InputSystem;
 
 public class Player : MonoBehaviour
 {
+    struct WheelGroundResult
+    {
+        public bool Grounded;
+        public float TargetChassisY;
+        public Vector2 Normal;
+        public float DistanceToGround;
+    }
+
     PlayerInputActions input;
     Vector2 moveInput;
 
@@ -105,27 +113,27 @@ public class Player : MonoBehaviour
 
     void CheckGroundAndRotate()
     {
-        bool frontGrounded = WheelGroundCheck(frontWheel, frontWheelCollider, out float frontTargetY, out Vector2 frontNormal);
-        bool rearGrounded = WheelGroundCheck(rearWheel, rearWheelCollider, out float rearTargetY, out Vector2 rearNormal);
+        var front = WheelGroundCheck(frontWheel, frontWheelCollider);
+        var rear  = WheelGroundCheck(rearWheel, rearWheelCollider);
 
-        if ((frontGrounded || rearGrounded) && verticalVelocity <= 0f)
+        if ((front.Grounded || rear.Grounded) && verticalVelocity <= 0f)
         {
             isGrounded = true;
 
-            float targetY = frontGrounded && rearGrounded
-                ? Mathf.Max(frontTargetY, rearTargetY)
-                : frontGrounded ? frontTargetY : rearTargetY;
+            float targetY = front.Grounded && rear.Grounded
+                ? Mathf.Max(front.TargetChassisY, rear.TargetChassisY)
+                : front.Grounded ? front.TargetChassisY : rear.TargetChassisY;
 
             Vector3 pos = transform.position;
             pos.y = Mathf.Lerp(pos.y, targetY, 10f * Time.deltaTime);
             transform.position = pos;
 
-            // When both wheels hit, their normals are averaged 
-            // (handles bumpy transitions); when only one hits, 
+            // When both wheels hit, their normals are averaged
+            // (handles bumpy transitions); when only one hits,
             // that normal alone drives the rotation
-            Vector2 normal = frontGrounded && rearGrounded
-                ? ((frontNormal + rearNormal) * 0.5f).normalized
-                : frontGrounded ? frontNormal : rearNormal;
+            Vector2 normal = front.Grounded && rear.Grounded
+                ? ((front.Normal + rear.Normal) * 0.5f).normalized
+                : front.Grounded ? front.Normal : rear.Normal;
 
             float targetAngle = Mathf.Atan2(-normal.x, normal.y) * Mathf.Rad2Deg;
             float smoothed = Mathf.LerpAngle(transform.eulerAngles.z, targetAngle, rotationSpeed * Time.deltaTime);
@@ -137,11 +145,10 @@ public class Player : MonoBehaviour
         }
     }
 
-    bool WheelGroundCheck(Transform wheel, CircleCollider2D col, out float targetChassisY, out Vector2 normal)
+    WheelGroundResult WheelGroundCheck(Transform wheel, CircleCollider2D col)
     {
-        targetChassisY = 0f;
-        normal = Vector2.up;
-        if (wheel == null) return false;
+        if (wheel == null)
+            return new WheelGroundResult { Normal = Vector2.up, DistanceToGround = float.MaxValue };
 
         float radius = col != null ? col.radius : 0.1f;
         Vector2 origin = wheel.position;
@@ -150,11 +157,22 @@ public class Player : MonoBehaviour
 
         if (hit.collider != null)
         {
-            targetChassisY = hit.point.y + radius - wheel.localPosition.y;
-            normal = hit.normal;
-            return true;
+            return new WheelGroundResult
+            {
+                Grounded = true,
+                TargetChassisY = hit.point.y + radius - wheel.localPosition.y,
+                Normal = hit.normal,
+                DistanceToGround = hit.distance
+            };
         }
-        return false;
+
+        return new WheelGroundResult
+        {
+            Grounded = false,
+            TargetChassisY = wheel.position.y,
+            Normal = Vector2.up,
+            DistanceToGround = float.MaxValue
+        };
     }
 
     void SpinWheel(Transform wheel, CircleCollider2D col, float dx, ref float angle)
