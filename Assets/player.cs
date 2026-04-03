@@ -30,6 +30,9 @@ public class Player : MonoBehaviour
 
     [Header("Rotation")]
     [SerializeField] float rotationSpeed = 20f;
+    [SerializeField] float airborneRotationSpeed = 10f;
+
+    public Vector3 StablePosition => transform.position - new Vector3(0f, chassisBobOffset, 0f);
 
     SpriteRenderer spriteRenderer;
     float verticalVelocity;
@@ -142,6 +145,8 @@ public class Player : MonoBehaviour
         else
         {
             isGrounded = false;
+            float smoothed = Mathf.LerpAngle(transform.eulerAngles.z, 0f, airborneRotationSpeed * Time.deltaTime);
+            transform.rotation = Quaternion.Euler(0f, 0f, smoothed);
         }
     }
 
